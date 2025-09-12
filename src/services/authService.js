@@ -83,6 +83,13 @@ export const authService = {
         return userStr ? JSON.parse(userStr) : null;
     },
 
+   // NEW: Get user ID for personId
+    getUserId: () => { // NEW
+        const user = JSON.parse(localStorage.getItem(USER_KEY));
+        if (!user) return null;
+        return user.id ?? null;  // NEW: returns undefined if no user
+    },
+
     getToken: () => {
         return localStorage.getItem(TOKEN_KEY);
     },
