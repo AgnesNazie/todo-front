@@ -24,7 +24,7 @@ const Teams = () => {
     }
   };
 
-  // Fetch all tasks
+  // Fetch tasks
   const fetchTasks = async () => {
     try {
       const tasksData = await TaskService.getTasks();
@@ -60,7 +60,7 @@ const Teams = () => {
     }
   };
 
-  // Calculate task stats per member dynamically
+  // Task stats per member
   const getTaskStats = (memberId) => {
     const memberTasks = tasks.filter((t) => t.personId === memberId);
     const totalTasks = memberTasks.length;
@@ -78,7 +78,8 @@ const Teams = () => {
         <Header title="Teams Management" />
         {error && <p className="error">{error}</p>}
 
-        <TeamsForm onCreate={handleCreate} />
+        <div className="teams-form-wrapper">
+            <TeamsForm onCreate={handleCreate} /></div>
 
         {loading ? (
           <p>Loading members...</p>
@@ -108,7 +109,7 @@ const Teams = () => {
                     ></div>
                   </div>
 
-                  <button onClick={() => handleDelete(member.id)}>Delete</button>
+                  <button className="delete-btn" onClick={() => handleDelete(member.id)}>Delete</button>
                 </div>
               );
             })}

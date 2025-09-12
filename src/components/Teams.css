@@ -74,12 +74,15 @@
   color: #555;
 }
 
-.teams-form input,
-.teams-form select {
-  padding: 10px 12px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-size: 1rem;
+.teams-form {
+  background: #ffffff;
+  padding: 30px; /* increased padding */
+  margin-bottom: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  width: 100%;
+  max-width: 700px; /* wider form */
 }
 
 .teams-form button {
@@ -174,13 +177,22 @@
   background-color: #b91c1c; /* Red-700 */
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .members-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  }
-  .teams-form {
-    max-width: 100%;
-  }
+.teams-form-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px auto;
+  width: 100%;
 }
 
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .teams-form {
+    max-width: 95%; /* use most of screen */
+    padding: 20px;
+  }
+
+  .teams-form h2 {
+    font-size: 1.25rem;
+  }
+}

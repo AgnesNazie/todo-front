@@ -44,7 +44,9 @@ const Sidebar = ({isOpen, onClose}) => {
 
     const handleNavigation = (path) => {
         navigate(path);
-        onClose();
+        if (typeof onClose === "function") {
+            onClose();
+        }
     };
 
     const handleLogout = async () => {
