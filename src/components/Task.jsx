@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import "./Task.css";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import Calendar from "./Calendar"; // your existing Calendar component
 import { useAuth } from "../context/AuthContext";
 import TaskService from "../services/taskService";
 
@@ -14,7 +15,15 @@ const Task = () => {
   const [filters, setFilters] = useState({ status: "", assignee: "" });
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch all tasks
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    dueDate: "",
+    completed: false,
+    personId: ""
+  });
+
+  // Fetch tasks
   const fetchTasks = async () => {
     try {
       let data = await TaskService.getTasks();
@@ -30,7 +39,7 @@ const Task = () => {
     }
   };
 
-  // Fetch all persons for admin assignment
+  // Fetch persons
   const fetchPersons = async () => {
     try {
       const data = await TaskService.getPersons();
@@ -43,18 +52,11 @@ const Task = () => {
   useEffect(() => {
     if (user) {
       fetchTasks();
-      fetchPersons();
+      if (isAdmin()) fetchPersons();
     }
   }, [user]);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    dueDate: "",
-    completed: false
-  });
-
+  // Form handlers
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -72,13 +74,14 @@ const Task = () => {
       title: "",
       description: "",
       dueDate: "",
-      completed: false
+      completed: false,
+      personId: ""
     });
     setAttachments([]);
     setSelectedTask(null);
   };
 
-  // Create or update task
+  // Create / Update Task
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title || formData.title.trim().length < 2) {
@@ -92,7 +95,6 @@ const Task = () => {
       dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null
     };
 
-    // For admins, assign task to selected person when creating
     if (!selectedTask && isAdmin() && formData.personId) {
       taskData.personId = Number(formData.personId);
     }
@@ -124,7 +126,7 @@ const Task = () => {
   // Complete task
   const handleComplete = async (task) => {
     try {
-      await TaskService.updateTask(task.id, { 
+      await TaskService.updateTask(task.id, {
         title: task.title,
         description: task.description,
         completed: true,
@@ -142,27 +144,37 @@ const Task = () => {
     setFormData({
       title: task.title,
       description: task.description,
-      dueDate: task.dueDate ? task.dueDate.substring(0, 16) : "",
-      completed: task.completed
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : "",
+      completed: task.completed,
+      personId: task.personId || ""
     });
     setAttachments([]);
   };
 
   // Filtered tasks
-  const filteredTasks = tasks
-    .filter(task =>
-      filters.status
-        ? filters.status === "completed"
-          ? task.completed
-          : !task.completed
-        : true
-    )
-    .filter(task =>
-      filters.assignee ? task.personId === parseInt(filters.assignee) : true
-    )
-    .filter(task =>
-      searchTerm ? task.title.toLowerCase().includes(searchTerm.toLowerCase()) : true
-    );
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      const isOverdue = !task.completed && task.dueDate && new Date(task.dueDate) < new Date();
+      const matchesStatus =
+        !filters.status ||
+        (filters.status === "completed" && task.completed) ||
+        (filters.status === "pending" && !task.completed && !isOverdue) ||
+        (filters.status === "overdue" && isOverdue);
+      const matchesAssignee = !filters.assignee || task.personId === parseInt(filters.assignee);
+      const matchesSearch = !searchTerm || task.title.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesStatus && matchesAssignee && matchesSearch;
+    });
+  }, [tasks, filters, searchTerm]);
+
+  // Calendar tasks
+  const calendarTasks = useMemo(() => {
+    return tasks.filter(task => {
+      if (!task.dueDate) return false;
+      const taskDate = new Date(task.dueDate);
+      if (isAdmin()) return task.completed || taskDate < new Date();
+      return task.personId === user.id;
+    });
+  }, [tasks, user, isAdmin]);
 
   if (!user) return <div>Loading user info...</div>;
 
@@ -174,6 +186,7 @@ const Task = () => {
         <div className="dashboard-content">
           <div className="row">
             <div className="col-md-8 mx-auto">
+
               {/* Task Form */}
               <div className="card shadow-sm task-form-section">
                 <div className="card-body">
@@ -217,7 +230,7 @@ const Task = () => {
                           <select
                             className="form-select"
                             name="personId"
-                            value={formData.personId || ""}
+                            value={formData.personId}
                             onChange={handleInputChange}
                           >
                             <option value="">-- Select Person --</option>
@@ -284,6 +297,7 @@ const Task = () => {
                     >
                       <option value="">All Status</option>
                       <option value="pending">Pending</option>
+                      <option value="overdue">Overdue</option>
                       <option value="completed">Completed</option>
                     </select>
                     {isAdmin() && (
@@ -303,13 +317,20 @@ const Task = () => {
                 <div className="card-body">
                   <div className="list-group">
                     {filteredTasks.map(task => {
-                      const canEditDelete = task.createdById === user.id || (isAdmin() && task.createdById === user.id);
-                      const canComplete = task.createdById === user.id || isAdmin();
+                      const isOverdue = !task.completed && task.dueDate && new Date(task.dueDate) < new Date();
+                      const canEditDelete = isAdmin() || task.createdById === user.id;
+                      const canComplete = isAdmin() || task.createdById === user.id;
+                      const statusBadge = task.completed
+                        ? "Completed"
+                        : isOverdue
+                        ? "Overdue"
+                        : "Pending";
+
                       return (
                         <div
                           key={task.id}
-                          className={`list-group-item list-group-item-action ${task.completed ? "completed-task" : ""} ${
-                            !task.completed && task.dueDate && new Date(task.dueDate) < new Date() ? "overdue-task" : ""
+                          className={`list-group-item list-group-item-action ${
+                            task.completed ? "completed-task" : isOverdue ? "overdue-task" : "pending-task"
                           }`}
                         >
                           <div className="d-flex w-100 justify-content-between align-items-start">
@@ -332,7 +353,9 @@ const Task = () => {
                                     <i className="bi bi-person"></i> {task.personName}
                                   </small>
                                 )}
-                                {task.completed && <span className="badge bg-success">Completed</span>}
+                                <span className={`badge ${task.completed ? "bg-success" : isOverdue ? "bg-danger" : "bg-warning text-dark"}`}>
+                                  {statusBadge}
+                                </span>
                               </div>
                             </div>
                             <div className="btn-group">
@@ -360,6 +383,16 @@ const Task = () => {
                 </div>
               </div>
 
+              {/* Calendar */}
+              <div className="card shadow-sm mt-4">
+                <div className="card-header bg-white">
+                  <h5 className="card-title mb-0">Task Calendar</h5>
+                </div>
+                <div className="card-body">
+                  <Calendar tasks={calendarTasks} user={user} isAdmin={isAdmin()} />
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -369,8 +402,4 @@ const Task = () => {
 };
 
 export default Task;
-
-
-
-
 
